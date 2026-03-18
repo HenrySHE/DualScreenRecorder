@@ -44,6 +44,29 @@ After downloading:
 6. Choose audio options
 7. Start recording
 
+## FFmpeg
+
+This project uses FFmpeg for final video and audio export.
+
+For normal users:
+
+- you do not need to install FFmpeg manually
+- the packaged app includes FFmpeg automatically
+
+For developers:
+
+- you normally do not need to install FFmpeg manually either
+- the project uses the `ffmpeg-static` package during development and packaging
+
+If you are only cloning the repository and running:
+
+```bash
+npm install
+npm run dev
+```
+
+that is enough to get the app running with FFmpeg support.
+
 ## Development
 
 ### Requirements
@@ -85,7 +108,7 @@ release/        Packaged app output
 ## Current Limitations
 
 - Windows-first project
-- FFmpeg is bundled for packaging and used during export
+- FFmpeg is bundled through `ffmpeg-static` and used during export
 - Very long recordings should still be tested in your own environment before production use
 
 ## License
