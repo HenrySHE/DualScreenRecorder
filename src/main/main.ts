@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+const ffmpegStatic = require("ffmpeg-static") as string | null;
 
 type SaveDialogKind = "video" | "audio";
 
@@ -38,7 +39,11 @@ function getFfmpegPath(): string {
     return path.join(process.resourcesPath, "ffmpeg.exe");
   }
 
-  return path.join(app.getAppPath(), "ffmpeg.exe");
+  if (!ffmpegStatic) {
+    throw new Error("ffmpeg-static did not provide a usable FFmpeg binary path.");
+  }
+
+  return ffmpegStatic;
 }
 
 function createWindow(): void {
