@@ -89,12 +89,17 @@ h1 {
 .controls,
 .output-list,
 .feature-strip,
-.inline-actions {
+.inline-actions,
+.quick-mode-grid {
   display: grid;
   gap: 12px;
 }
 
 .selection-grid {
+  margin-top: 14px;
+}
+
+.quick-mode-grid {
   margin-top: 14px;
 }
 
@@ -175,6 +180,11 @@ select {
 .secondary-button {
   background: #12324e;
   color: #d6efff;
+}
+
+.selected-chip {
+  outline: 1px solid #66d9e8;
+  background: rgba(13, 54, 67, 0.95);
 }
 
 .danger-button {

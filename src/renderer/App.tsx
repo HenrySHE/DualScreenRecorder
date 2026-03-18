@@ -17,6 +17,9 @@ type RecorderSession = {
   cleanup: () => void;
 };
 
+type FrameRateOption = 15 | 24 | 30 | 60;
+type QualityOption = "original" | "1080p" | "720p";
+
 type ExportedFiles = {
   rawPath: string;
   videoPath: string;
@@ -24,6 +27,12 @@ type ExportedFiles = {
 };
 
 const MAX_SCREEN_SELECTION = 2;
+const FRAME_RATE_OPTIONS: FrameRateOption[] = [15, 24, 30, 60];
+const QUALITY_OPTIONS: Array<{ value: QualityOption; label: string }> = [
+  { value: "original", label: "Original" },
+  { value: "1080p", label: "1080p" },
+  { value: "720p", label: "720p" }
+];
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -32,6 +41,31 @@ function formatDuration(ms: number): string {
     .padStart(2, "0");
   const seconds = (totalSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function getTargetHeight(maxHeight: number, quality: QualityOption): number {
+  if (quality === "720p") {
+    return Math.min(maxHeight, 720);
+  }
+
+  if (quality === "1080p") {
+    return Math.min(maxHeight, 1080);
+  }
+
+  return maxHeight;
+}
+
+function getVideoBitrate(frameRate: FrameRateOption, quality: QualityOption): number {
+  const baseBitrate = quality === "720p" ? 5_000_000 : quality === "1080p" ? 8_000_000 : 12_000_000;
+  if (frameRate >= 60) {
+    return Math.round(baseBitrate * 1.35);
+  }
+
+  if (frameRate <= 15) {
+    return Math.round(baseBitrate * 0.7);
+  }
+
+  return baseBitrate;
 }
 
 function getMimeType(): string {
@@ -68,6 +102,8 @@ async function buildRecorderSession(options: {
   micEnabled: boolean;
   micDeviceId: string;
   systemAudioEnabled: boolean;
+  frameRate: FrameRateOption;
+  quality: QualityOption;
 }): Promise<RecorderSession> {
   if (options.selectedSources.length === 0) {
     throw new Error("Please select at least one screen.");
@@ -111,12 +147,13 @@ async function buildRecorderSession(options: {
   }));
 
   const maxHeight = Math.max(...videoMetrics.map((item) => item.height));
+  const targetHeight = getTargetHeight(maxHeight, options.quality);
   const scaledWidths = videoMetrics.map((item) =>
-    Math.round((item.width / item.height) * maxHeight)
+    Math.round((item.width / item.height) * targetHeight)
   );
 
   canvas.width = scaledWidths.reduce((sum, current) => sum + current, 0);
-  canvas.height = maxHeight;
+  canvas.height = targetHeight;
 
   let drawTimer = 0;
   let isActive = true;
@@ -161,10 +198,10 @@ async function buildRecorderSession(options: {
   if (supportsVideoFrameCallback) {
     videos.forEach(registerVideoFrameLoop);
   } else {
-    drawTimer = window.setInterval(draw, 1000 / 30);
+    drawTimer = window.setInterval(draw, 1000 / options.frameRate);
   }
 
-  const mixedStream = canvas.captureStream(30);
+  const mixedStream = canvas.captureStream(options.frameRate);
   const audioContext = new AudioContext();
   const destination = audioContext.createMediaStreamDestination();
   let hasAudioTrack = false;
@@ -194,7 +231,7 @@ async function buildRecorderSession(options: {
   const chunks: BlobPart[] = [];
   const recorder = new MediaRecorder(mixedStream, {
     mimeType: getMimeType(),
-    videoBitsPerSecond: 8_000_000,
+    videoBitsPerSecond: getVideoBitrate(options.frameRate, options.quality),
     audioBitsPerSecond: 192_000
   });
 
@@ -268,6 +305,8 @@ export default function App() {
   const [screens, setScreens] = useState<ScreenSource[]>([]);
   const [selectedScreenIds, setSelectedScreenIds] = useState<string[]>([]);
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [frameRate, setFrameRate] = useState<FrameRateOption>(30);
+  const [quality, setQuality] = useState<QualityOption>("1080p");
   const [selectedMicId, setSelectedMicId] = useState("");
   const [micEnabled, setMicEnabled] = useState(true);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
@@ -357,6 +396,14 @@ export default function App() {
     });
   }
 
+  function setSingleScreen(sourceId: string) {
+    setSelectedScreenIds([sourceId]);
+  }
+
+  function setDualScreenMode() {
+    setSelectedScreenIds(screens.slice(0, Math.min(MAX_SCREEN_SELECTION, screens.length)).map((item) => item.id));
+  }
+
   async function handleStart() {
     if (orderedSelectedScreens.length === 0) {
       setStatus("Select at least one screen before starting.");
@@ -371,7 +418,9 @@ export default function App() {
         selectedSources: orderedSelectedScreens,
         micEnabled,
         micDeviceId: selectedMicId,
-        systemAudioEnabled
+        systemAudioEnabled,
+        frameRate,
+        quality
       });
 
       sessionRef.current = session;
@@ -523,6 +572,25 @@ export default function App() {
               Refresh
             </button>
           </div>
+          <div className="quick-mode-grid">
+            {screens.slice(0, 2).map((screen, index) => (
+              <button
+                key={`single-${screen.id}`}
+                className={`secondary-button ${selectedScreenIds.length === 1 && selectedScreenIds[0] === screen.id ? "selected-chip" : ""}`}
+                onClick={() => setSingleScreen(screen.id)}
+                disabled={isRecording || isBusy}
+              >
+                {`Only Monitor ${index + 1}`}
+              </button>
+            ))}
+            <button
+              className={`secondary-button ${selectedScreenIds.length === 2 ? "selected-chip" : ""}`}
+              onClick={setDualScreenMode}
+              disabled={isRecording || isBusy || screens.length < 2}
+            >
+              Record Both Monitors
+            </button>
+          </div>
           <div className="selection-grid">
             {screens.map((screen) => {
               const active = selectedScreenIds.includes(screen.id);
@@ -552,7 +620,40 @@ export default function App() {
               Swap Left / Right
             </button>
           </div>
-          <p className="hint">You can select up to two displays. Recording order controls left/right placement in the exported video.</p>
+          <p className="hint">You can record only Monitor 1, only Monitor 2, or both. Recording order controls left/right placement in the exported video.</p>
+        </section>
+
+        <section className="panel">
+          <h2>Recording Settings</h2>
+          <label className="field">
+            <span>Frame rate</span>
+            <select
+              value={frameRate}
+              onChange={(event) => setFrameRate(Number(event.target.value) as FrameRateOption)}
+              disabled={isRecording || isBusy}
+            >
+              {FRAME_RATE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option} FPS
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Quality</span>
+            <select
+              value={quality}
+              onChange={(event) => setQuality(event.target.value as QualityOption)}
+              disabled={isRecording || isBusy}
+            >
+              {QUALITY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="hint">Quality controls the exported resolution target. Original keeps source size, while 1080p and 720p cap output height.</p>
         </section>
 
         <section className="panel">
