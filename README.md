@@ -8,8 +8,10 @@ It is designed for people who need to record one or two displays at the same tim
 
 ## Features
 
-- Record a single display or two displays at the same time
+- Record only monitor 1, only monitor 2, or two displays at the same time
 - Swap left/right display order before recording
+- Control recording frame rate: 15 / 24 / 30 / 60 FPS
+- Control recording quality: Original / 1080p / 720p
 - Capture microphone audio and system audio together
 - Pause and resume during the same recording session
 - Export recordings as MP4
@@ -37,9 +39,10 @@ After downloading:
 1. Run the installer
 2. Choose the install directory if needed
 3. Launch `Dual Screen Recorder`
-4. Select one or two screens
-5. Choose audio options
-6. Start recording
+4. Choose `Only Monitor 1`, `Only Monitor 2`, or `Record Both Monitors`
+5. Set frame rate and quality if needed
+6. Choose audio options
+7. Start recording
 
 ## Development
 
@@ -99,4 +102,3 @@ If you report a bug, include:
 - whether you used one or two monitors
 - whether microphone/system audio were enabled
 - whether the issue happened during preview, export, or playback
-
